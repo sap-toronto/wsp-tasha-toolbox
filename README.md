@@ -1,2 +1,2 @@
-# wsp-tasha-toolkit
-Toolkit for TASHA-based models
+# wsp-tasha-toolbox
+Toolbox for TASHA-based models

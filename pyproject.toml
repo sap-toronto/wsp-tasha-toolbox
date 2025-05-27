@@ -1,0 +1,23 @@
+[project]
+name = "wsp-tasha-toolbox"
+version = "0.1.0"
+description = "Toolbox for TASHA-based models"
+readme = "README.md"
+authors = [
+    { name = "Brian Cheung", email = "bccheung@outlook.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "geopandas>=1.0.1",
+    "numpy>=2.2.6",
+    "pandas>=2.2.3",
+    "pyproj>=3.7.1",
+    "wsp-balsa>=2.0.0",
+]
+
+[project.scripts]
+wsp-tasha-toolbox = "wsp_tasha_toolbox:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
