@@ -62,7 +62,7 @@ class MicrosimData:
 
     @property
     def logger(self) -> ModelLogger:
-        return get_model_logger(f"tasha_toolbox.{self.__class__.__name__}")
+        return get_model_logger(f"wsp_tasha_toolbox.{self.__class__.__name__}")
 
     @property
     def households(self) -> pd.DataFrame:
