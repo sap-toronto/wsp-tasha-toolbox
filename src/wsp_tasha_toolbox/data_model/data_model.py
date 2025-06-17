@@ -24,6 +24,8 @@ class MicrosimData:
         trip_stations (pd.DataFrame): The trip stations table
         facilitate_passengers (pd.DataFrame, optional): Defaults to ``None``. The facilitate passengers table
         zones (gpd.GeoDataFrame, optional): Defaults to ``None``. The modelled zone system
+        reweight_trips (bool, optional): Defaults to ``True``. A flag to reweight trip modes and trip station tables to
+            reflect total number of trips modelled in the trip table.
     """
 
     def __init__(
@@ -36,6 +38,7 @@ class MicrosimData:
         *,
         facilitate_passengers: pd.DataFrame = None,
         zones: gpd.GeoDataFrame = None,
+        reweight_trips: bool = True,
     ):
         self.logger.tip("Loading microsim tables")
 
@@ -46,6 +49,9 @@ class MicrosimData:
         self._trip_stations = trip_stations
         self._facilitate_passengers = facilitate_passengers
         self._zones = zones
+
+        if reweight_trips:
+            self.adjust_trip_weights()
 
         self.logger.report("Microsim tables successfully loaded!")
 
@@ -259,5 +265,33 @@ class MicrosimData:
             ).map(person_idx["person_id"])
             facilitate_passengers["driver_id"] = facilitate_passengers_idx["driver_id"]
             facilitate_passengers.index = pd.MultiIndex.from_frame(facilitate_passengers_idx.drop("driver_id", axis=1))
+
+    # endregion
+
+    # region Finalize initialization
+
+    def adjust_trip_weights(self):
+        self.logger.info("Adjusting weights in trip modes and trip stations tables")
+
+        trips = self.trips
+        trip_modes = self.trip_modes
+        trip_stations = self.trip_stations
+
+        trips["repetitions"] = trip_modes.groupby(["household_id", "person_id", "trip_id"])["weight"].sum()
+
+        trip_modes.rename(columns={"weight": "orig_weight"}, inplace=True)
+        trip_modes["weight"] = (
+            trip_modes["orig_weight"]
+            / trips["repetitions"].reindex(trip_modes.index)
+            * trips["weight"].reindex(trip_modes.index)
+        )
+
+        if "mode" in trip_stations:
+            trip_stations.rename(columns={"weight": "orig_weight"}, inplace=True)
+            trip_stations["weight"] = (
+                trip_modes.set_index("mode", append=True)
+                .loc[trip_stations.set_index("mode", append=True).index, "weight"]
+                .droplevel("mode")
+            )
 
     # endregion
