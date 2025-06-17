@@ -76,5 +76,5 @@ class FacilitatePassengersSchema(pa.DataFrameModel):
     passenger_id: Index[np.uint64] = pa.Field(ge=1, coerce=True, check_name=True)
     passenger_trip_id: Index[np.uint16] = pa.Field(ge=1, coerce=True, check_name=True)
     driver_id: Series[np.uint64] = pa.Field(ge=1, coerce=True, check_name=True)
-    driver_trip_id: Series[np.uint16] = pa.Field(ge=1, coerce=True, check_name=True)
+    driver_trip_id: Series[np.int16] = pa.Field(coerce=True, check_name=True)
     weight: Series[np.int64] = pa.Field(ge=1, coerce=True)

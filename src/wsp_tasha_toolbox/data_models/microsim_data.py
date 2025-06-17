@@ -35,27 +35,55 @@ class MicrosimData:
         self._zones = zones
 
     @classmethod
-    def from_result_folder(cls, results_folder: PathLike | str) -> MicrosimData:
+    def from_result_folder(
+        cls,
+        results_folder: PathLike | str,
+        *,
+        rebuild_indices: bool = True,
+        sort_indices: bool = True,
+    ) -> MicrosimData:
         microsim_folder = Path(results_folder) / "Microsim Results"
 
         households = cls._load_households(microsim_folder / "households.csv")
-        persons = cls._load_persons(microsim_folder / "persons.csv")
-        trips = cls._load_trips(microsim_folder / "trips.csv")
-        trip_modes = cls._load_trips(microsim_folder / "trip_modes.csv")
-        trip_stations = cls._load_trip_stations(microsim_folder / "trip_stations.csv")
+        persons = cls._load_persons(microsim_folder / "persons.csv", rebuild_index=rebuild_indices)
+        trips = cls._load_trips(microsim_folder / "trips.csv", rebuild_index=rebuild_indices)
+        trip_modes = cls._load_trips(microsim_folder / "trip_modes.csv", rebuild_index=rebuild_indices)
+        trip_stations = cls._load_trip_stations(microsim_folder / "trip_stations.csv", rebuild_index=rebuild_indices)
         facilitate_passengers_fp = microsim_folder / "facilitate_passenger.csv"
         if facilitate_passengers_fp.exists():
-            facilitate_passengers = cls._load_facilitate_passengers(facilitate_passengers_fp)
+            facilitate_passengers = cls._load_facilitate_passengers(
+                facilitate_passengers_fp, rebuild_index=rebuild_indices
+            )
         else:
             facilitate_passengers = None
 
+        # Reindex persons
+        if rebuild_indices:
+            cls._rebuild_microsim_indices(
+                households, persons, trips, trip_modes, trip_stations, facilitate_passengers=facilitate_passengers
+            )
+
+        # Sort indices
+        if sort_indices:
+            households.sort_index(inplace=True)
+            persons.sort_index(inplace=True)
+            trips.sort_index(inplace=True)
+            trip_modes.sort_index(inplace=True)
+            trip_stations.sort_index(inplace=True)
+            if facilitate_passengers is not None:
+                facilitate_passengers.sort_index(inplace=True)
+
         data = cls(
-            households,
-            persons,
-            trips,
-            trip_modes,
-            trip_stations,
-            facilitate_passenger=facilitate_passengers,
+            ms.HouseholdsSchema.validate(households),
+            ms.PersonsSchema.validate(persons),
+            ms.TripsSchema.validate(trips),
+            ms.TripModesSchema.validate(trip_modes),
+            ms.TripStationsSchema.validate(trip_stations),
+            facilitate_passengers=(
+                ms.FacilitatePassengersSchema.validate(facilitate_passengers)
+                if facilitate_passengers_fp.exists()
+                else None
+            ),
         )
 
         return data
@@ -98,53 +126,99 @@ class MicrosimData:
             "household_id": np.uint64,
         }
         df = pd.read_csv(fp, index_col="household_id", dtype=spec)
-        return ms.HouseholdsSchema.validate(df)
+        return df
 
     @staticmethod
-    def _load_persons(fp: PathLike | str) -> pd.DataFrame:
+    def _load_persons(fp: PathLike | str, *, rebuild_index: bool = False) -> pd.DataFrame:
         spec = {
             "household_id": np.uint64,
-            "person_id": np.uint64,
+            "person_id": str if rebuild_index else np.uint64,
         }
         df = pd.read_csv(fp, index_col=["household_id", "person_id"], dtype=spec)
-        return ms.PersonsSchema.validate(df)
+        return df
 
     @staticmethod
-    def _load_trips(fp: PathLike | str) -> pd.DataFrame:
+    def _load_trips(fp: PathLike | str, *, rebuild_index: bool = False) -> pd.DataFrame:
         spec = {
             "household_id": np.uint64,
-            "person_id": np.uint64,
+            "person_id": str if rebuild_index else np.uint64,
+            "trip_id": np.uint16,
+            "JointTourRep": str if rebuild_index else np.uint64,
+        }
+        df = pd.read_csv(fp, index_col=["household_id", "person_id", "trip_id"], dtype=spec)
+        return df
+
+    @staticmethod
+    def _load_trip_modes(fp: PathLike | str, *, rebuild_index: bool = False) -> pd.DataFrame:
+        spec = {
+            "household_id": np.uint64,
+            "person_id": str if rebuild_index else np.uint64,
             "trip_id": np.uint16,
         }
         df = pd.read_csv(fp, index_col=["household_id", "person_id", "trip_id"], dtype=spec)
-        return ms.TripsSchema.validate(df, lazy=True)
+        return df
 
     @staticmethod
-    def _load_trip_modes(fp: PathLike | str) -> pd.DataFrame:
+    def _load_trip_stations(fp: PathLike | str, *, rebuild_index: bool = False) -> pd.DataFrame:
         spec = {
             "household_id": np.uint64,
-            "person_id": np.uint64,
+            "person_id": str if rebuild_index else np.uint64,
             "trip_id": np.uint16,
         }
         df = pd.read_csv(fp, index_col=["household_id", "person_id", "trip_id"], dtype=spec)
-        return ms.TripModesSchema.validate(df)
+        return df
 
     @staticmethod
-    def _load_trip_stations(fp: PathLike | str) -> pd.DataFrame:
+    def _load_facilitate_passengers(fp: PathLike | str, *, rebuild_index: bool = False) -> pd.DataFrame:
         spec = {
             "household_id": np.uint64,
-            "person_id": np.uint64,
-            "trip_id": np.uint16,
-        }
-        df = pd.read_csv(fp, index_col=["household_id", "person_id", "trip_id"], dtype=spec)
-        return ms.TripStationsSchema.validate(df)
-
-    @staticmethod
-    def _load_facilitate_passengers(fp: PathLike | str) -> pd.DataFrame:
-        spec = {
-            "household_id": np.uint64,
-            "passenger_id": np.uint64,
+            "passenger_id": str if rebuild_index else np.uint64,
             "passenger_trip_id": np.uint16,
+            "driver_id": str if rebuild_index else np.uint64,
         }
         df = pd.read_csv(fp, index_col=["household_id", "passenger_id", "passenger_trip_id"], dtype=spec)
-        return ms.FacilitatePassengersSchema.validate(df)
+        return df
+
+    @staticmethod
+    def _rebuild_microsim_indices(
+        households: pd.DataFrame,
+        persons: pd.DataFrame,
+        trips: pd.DataFrame,
+        trip_modes: pd.DataFrame,
+        trip_stations: pd.DataFrame,
+        *,
+        facilitate_passengers: pd.DataFrame = None,
+    ):
+        person_idx = persons.index.copy().to_frame()
+        person_idx["person_id"] = persons.groupby("household_id")["weight"].cumcount() + 1
+        persons.index = pd.MultiIndex.from_frame(person_idx)
+
+        trips_idx = trips.index.copy().to_frame()
+        trips_idx["person_id"] = trips.index.droplevel("trip_id").map(person_idx["person_id"])
+        trips.index = pd.MultiIndex.from_frame(trips_idx)
+        if "JointTourRep" in trips:
+            trips["JointTourRep"] = (
+                pd.MultiIndex.from_arrays([trips.index.get_level_values("household_id"), trips["JointTourRep"]])
+                .map(person_idx["person_id"])
+                .fillna(-1)
+                .astype(np.int64)
+            )
+
+        trip_modes_idx = trip_modes.index.copy().to_frame()
+        trip_modes_idx["person_id"] = trip_modes.index.droplevel("trip_id").map(person_idx["person_id"])
+        trip_modes.index = pd.MultiIndex.from_frame(trip_modes_idx)
+
+        trip_stations_idx = trip_stations.index.copy().to_frame()
+        trip_stations_idx["person_id"] = trip_stations.index.droplevel("trip_id").map(person_idx["person_id"])
+        trip_stations.index = pd.MultiIndex.from_frame(trip_stations_idx)
+
+        if facilitate_passengers is not None:
+            facilitate_passengers_idx = facilitate_passengers.index.copy().to_frame()
+            facilitate_passengers_idx["passenger_id"] = facilitate_passengers.index.droplevel("passenger_trip_id").map(
+                person_idx["person_id"]
+            )
+            facilitate_passengers_idx["driver_id"] = pd.MultiIndex.from_arrays(
+                [facilitate_passengers.index.get_level_values("household_id"), facilitate_passengers["driver_id"]]
+            ).map(person_idx["person_id"])
+            facilitate_passengers["driver_id"] = facilitate_passengers_idx["driver_id"]
+            facilitate_passengers.index = pd.MultiIndex.from_frame(facilitate_passengers_idx.drop("driver_id", axis=1))
