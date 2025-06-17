@@ -14,6 +14,17 @@ from . import schema as ms
 
 
 class MicrosimData:
+    """Data model for working with microsimulation outputs from a TASHA-based model
+
+    Args:
+        households (pd.DataFrame): The household table
+        persons (pd.DataFrame): The person table
+        trips (pd.DataFrame): The trips table
+        trip_modes (pd.DataFrame): The trip modes table
+        trip_stations (pd.DataFrame): The trip stations table
+        facilitate_passengers (pd.DataFrame, optional): Defaults to ``None``. The facilitate passengers table
+        zones (gpd.GeoDataFrame, optional): Defaults to ``None``. The modelled zone system
+    """
 
     def __init__(
         self,
@@ -26,6 +37,8 @@ class MicrosimData:
         facilitate_passengers: pd.DataFrame = None,
         zones: gpd.GeoDataFrame = None,
     ):
+        self.logger.tip("Loading microsim tables")
+
         self._households = households
         self._persons = persons
         self._trips = trips
@@ -33,6 +46,53 @@ class MicrosimData:
         self._trip_stations = trip_stations
         self._facilitate_passengers = facilitate_passengers
         self._zones = zones
+
+        self.logger.report("Microsim tables successfully loaded!")
+
+    # region Properties
+
+    @property
+    def logger(self) -> ModelLogger:
+        return get_model_logger(f"wsp_tasha_toolbox.{self.__class__.__name__}")
+
+    @property
+    def households(self) -> pd.DataFrame:
+        """Modelled microsim households table"""
+        return self._households
+
+    @property
+    def persons(self) -> pd.DataFrame:
+        """Modelled microsim persons table"""
+        return self._persons
+
+    @property
+    def trips(self) -> pd.DataFrame:
+        """Modelled microsim trips table"""
+        return self._trips
+
+    @property
+    def trip_modes(self) -> pd.DataFrame:
+        """Modelled microsim trip modes table"""
+        return self._trip_modes
+
+    @property
+    def trip_stations(self) -> pd.DataFrame:
+        """Modelled microsim trip stations table"""
+        return self._trip_stations
+
+    @property
+    def facilitate_passengers(self) -> Optional[pd.DataFrame]:
+        """Modelled microsim facilitate passengers table"""
+        return self._facilitate_passengers
+
+    @property
+    def zones(self) -> Optional[gpd.GeoDataFrame]:
+        """Model zone system table"""
+        return self._zones
+
+    # endregion
+
+    # region Loading
 
     @classmethod
     def from_result_folder(
@@ -42,8 +102,16 @@ class MicrosimData:
         rebuild_indices: bool = True,
         sort_indices: bool = True,
     ) -> MicrosimData:
+        """Initialize a new instance of MicrosimData using files from a model run result folder
+
+        Args:
+            results_folder (PathLike | str): Path to the model run result folder
+            rebuild_indices (bool, optional): Defaults to ``True``. A flag to rebuild indices in the microsim tables.
+            sort_indices (bool, optional): Defaults to ``True``. A flag to sort indices in the microsim tables.
+        """
         microsim_folder = Path(results_folder) / "Microsim Results"
 
+        # Load data
         households = cls._load_households(microsim_folder / "households.csv")
         persons = cls._load_persons(microsim_folder / "persons.csv", rebuild_index=rebuild_indices)
         trips = cls._load_trips(microsim_folder / "trips.csv", rebuild_index=rebuild_indices)
@@ -87,38 +155,6 @@ class MicrosimData:
         )
 
         return data
-
-    @property
-    def logger(self) -> ModelLogger:
-        return get_model_logger(f"wsp_tasha_toolbox.{self.__class__.__name__}")
-
-    @property
-    def households(self) -> pd.DataFrame:
-        return self._households
-
-    @property
-    def persons(self) -> pd.DataFrame:
-        return self._persons
-
-    @property
-    def trips(self) -> pd.DataFrame:
-        return self._trips
-
-    @property
-    def trip_modes(self) -> pd.DataFrame:
-        return self._trip_modes
-
-    @property
-    def trip_stations(self) -> pd.DataFrame:
-        return self._trip_stations
-
-    @property
-    def facilitate_passengers(self) -> Optional[pd.DataFrame]:
-        return self._facilitate_passengers
-
-    @property
-    def zones(self) -> Optional[gpd.GeoDataFrame]:
-        return self._zones
 
     @staticmethod
     def _load_households(fp: PathLike | str) -> pd.DataFrame:
@@ -189,6 +225,7 @@ class MicrosimData:
         *,
         facilitate_passengers: pd.DataFrame = None,
     ):
+        """Rebuild invalid microsim indicies in-place"""
         person_idx = persons.index.copy().to_frame()
         person_idx["person_id"] = persons.groupby("household_id")["weight"].cumcount() + 1
         persons.index = pd.MultiIndex.from_frame(person_idx)
@@ -222,3 +259,5 @@ class MicrosimData:
             ).map(person_idx["person_id"])
             facilitate_passengers["driver_id"] = facilitate_passengers_idx["driver_id"]
             facilitate_passengers.index = pd.MultiIndex.from_frame(facilitate_passengers_idx.drop("driver_id", axis=1))
+
+    # endregion
