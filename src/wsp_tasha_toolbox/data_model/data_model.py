@@ -271,11 +271,12 @@ class MicrosimData:
     # region Finalize initialization
 
     def adjust_trip_weights(self):
-        self.logger.info("Adjusting weights in trip modes and trip stations tables")
+        self.logger.info("Adjusting weights in trip mode, station, and facilitate passenger (if available) tables")
 
         trips = self.trips
         trip_modes = self.trip_modes
         trip_stations = self.trip_stations
+        facilitate_passengers = self.facilitate_passengers
 
         trips["repetitions"] = trip_modes.groupby(["household_id", "person_id", "trip_id"])["weight"].sum()
 
@@ -292,6 +293,14 @@ class MicrosimData:
                 trip_modes.set_index("mode", append=True)
                 .loc[trip_stations.set_index("mode", append=True).index, "weight"]
                 .droplevel("mode")
+            )
+
+        if facilitate_passengers is not None:
+            facilitate_passengers.rename(columns={"weight": "orig_weight"}, inplace=True)
+            facilitate_passengers["weight"] = (
+                facilitate_passengers["orig_weight"]
+                / trips["repetitions"].reindex(facilitate_passengers.index)
+                * trips["weight"].reindex(facilitate_passengers.index)
             )
 
     # endregion
