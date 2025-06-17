@@ -4,7 +4,7 @@ from typing import Optional
 
 import numpy as np
 import pandera.pandas as pa
-from pandera.typing.pandas import Index, Series
+from pandera.typing.pandas import Category, Index, Series
 
 from ..common.enums_microsim import Activity, Direction, Mode
 from ..common.enums_tts2016 import (DwellingType, EmploymentStatus, Gender,
@@ -25,13 +25,13 @@ class PersonsSchema(pa.DataFrameModel):
     household_id: Index[np.uint64] = pa.Field(ge=1, coerce=True, check_name=True)
     person_id: Index[np.uint64] = pa.Field(ge=1, coerce=True, check_name=True)
     age: Series[np.int16] = pa.Field(ge=0, le=100, coerce=True)
-    sex: Series[str] = pa.Field(isin=Gender, coerce=True)
+    sex: Series[Category] = pa.Field(isin=Gender, coerce=True)
     license: Series[bool] = pa.Field(coerce=True)
     transit_pass: Series[bool] = pa.Field(coerce=True)
-    employment_status: Series[str] = pa.Field(isin=EmploymentStatus, coerce=True)
-    occupation: Series[str] = pa.Field(isin=Occupation, coerce=True)
+    employment_status: Series[Category] = pa.Field(isin=EmploymentStatus, coerce=True)
+    occupation: Series[Category] = pa.Field(isin=Occupation, coerce=True)
     free_parking: Series[bool] = pa.Field(coerce=True)
-    student_status: Series[str] = pa.Field(isin=StudentStatus, coerce=True)
+    student_status: Series[Category] = pa.Field(isin=StudentStatus, coerce=True)
     work_zone: Series[np.int16] = pa.Field(ge=0, coerce=True)
     school_zone: Series[np.int16] = pa.Field(ge=0, coerce=True)
     weight: Series[np.int64] = pa.Field(ge=1, coerce=True)
@@ -42,9 +42,9 @@ class TripsSchema(pa.DataFrameModel):
     household_id: Index[np.uint64] = pa.Field(ge=1, coerce=True, check_name=True)
     person_id: Index[np.uint64] = pa.Field(ge=1, coerce=True, check_name=True)
     trip_id: Index[np.uint16] = pa.Field(ge=1, coerce=True, check_name=True)
-    o_act: Series[str] = pa.Field(isin=Activity, coerce=True)
+    o_act: Series[Category] = pa.Field(isin=Activity, coerce=True)
     o_zone: Series[np.int16] = pa.Field(ge=0, coerce=True)
-    d_act: Series[str] = pa.Field(isin=Activity, coerce=True)
+    d_act: Series[Category] = pa.Field(isin=Activity, coerce=True)
     d_zone: Series[np.int16] = pa.Field(ge=0, coerce=True)
     weight: Series[np.int64] = pa.Field(ge=1, coerce=True)
     JointTourRep: Optional[Series[np.int64]] = pa.Field(coerce=True)
@@ -55,7 +55,7 @@ class TripModesSchema(pa.DataFrameModel):
     household_id: Index[np.uint64] = pa.Field(ge=1, coerce=True, check_name=True)
     person_id: Index[np.uint64] = pa.Field(ge=1, coerce=True, check_name=True)
     trip_id: Index[np.uint16] = pa.Field(ge=1, coerce=True, check_name=True)
-    mode: Series[str] = pa.Field(isin=Mode, coerce=True)
+    mode: Series[Category] = pa.Field(isin=Mode, coerce=True)
     o_depart: Series[np.float64] = pa.Field(ge=0, coerce=True)
     d_arrive: Series[np.float64] = pa.Field(ge=0, coerce=True)
     weight: Series[np.int64] = pa.Field(ge=1, coerce=True)
@@ -66,9 +66,9 @@ class TripStationsSchema(pa.DataFrameModel):
     person_id: Index[np.uint64] = pa.Field(ge=1, coerce=True, check_name=True)
     trip_id: Index[np.uint16] = pa.Field(ge=1, coerce=True, check_name=True)
     station: Series[np.int16] = pa.Field(ge=0, coerce=True)
-    direction: Series[str] = pa.Field(isin=Direction, coerce=True)
+    direction: Series[Category] = pa.Field(isin=Direction, coerce=True)
     weight: Series[np.int64] = pa.Field(ge=1, coerce=True)
-    mode: Optional[Series[str]] = pa.Field(isin=Mode, coerce=True)
+    mode: Optional[Series[Category]] = pa.Field(isin=Mode, coerce=True)
 
 
 class FacilitatePassengersSchema(pa.DataFrameModel):
