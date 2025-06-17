@@ -24,8 +24,8 @@ class MicrosimData:
         trip_stations (pd.DataFrame): The trip stations table
         facilitate_passengers (pd.DataFrame, optional): Defaults to ``None``. The facilitate passengers table
         zones (gpd.GeoDataFrame, optional): Defaults to ``None``. The modelled zone system
-        reweight_trips (bool, optional): Defaults to ``True``. A flag to reweight trip modes and trip station tables to
-            reflect total number of trips modelled in the trip table.
+        reweight_trips (bool, optional): Defaults to ``True``. A flag to reweight trip modes, trip station, and
+            facilitate passenger (if available) tables to match total number of trips modelled in the trip table.
     """
 
     def __init__(
