@@ -10,6 +10,7 @@ import pandas as pd
 from wsp_balsa.logging import ModelLogger, get_model_logger
 from wsp_balsa.routines import distance_matrix, read_mdf
 
+from ..common.enums_data import TimeFormat
 from . import schema as ms
 
 
@@ -26,7 +27,11 @@ class MicrosimData:
         zones (gpd.GeoDataFrame, optional): Defaults to ``None``. The modelled zone system
         reweight_trips (bool, optional): Defaults to ``True``. A flag to reweight trip modes, trip station, and
             facilitate passenger (if available) tables to match total number of trips modelled in the trip table.
+        derive_additional_attributes (bool, optional): Defaults to ``True``. A flag to calculate additional attributes
+            useful in model analyses
     """
+
+    time_period_bins = (0, 6, 9, 15, 19, 24, np.inf)
 
     def __init__(
         self,
@@ -39,7 +44,8 @@ class MicrosimData:
         facilitate_passengers: pd.DataFrame = None,
         zones: gpd.GeoDataFrame = None,
         reweight_trips: bool = True,
-    ):
+        derive_additional_attributes: bool = True,
+    ) -> None:
         self.logger.tip("Loading microsim tables")
 
         self._households = households
@@ -51,7 +57,10 @@ class MicrosimData:
         self._zones = zones
 
         if reweight_trips:
-            self.adjust_trip_weights()
+            self._adjust_trip_weights()
+
+        if derive_additional_attributes:
+            self._classify_times()
 
         self.logger.report("Microsim tables successfully loaded!")
 
@@ -230,7 +239,7 @@ class MicrosimData:
         trip_stations: pd.DataFrame,
         *,
         facilitate_passengers: pd.DataFrame = None,
-    ):
+    ) -> None:
         """Rebuild invalid microsim indicies in-place"""
         person_idx = persons.index.copy().to_frame()
         person_idx["person_id"] = persons.groupby("household_id")["weight"].cumcount() + 1
@@ -270,7 +279,7 @@ class MicrosimData:
 
     # region Finalize initialization
 
-    def adjust_trip_weights(self):
+    def _adjust_trip_weights(self) -> None:
         self.logger.info("Adjusting weights in trip mode, station, and facilitate passenger (if available) tables")
 
         trips = self.trips
@@ -302,5 +311,54 @@ class MicrosimData:
                 / trips["repetitions"].reindex(facilitate_passengers.index)
                 * trips["weight"].reindex(facilitate_passengers.index)
             )
+
+    def _classify_times(self, *, time_format: TimeFormat = TimeFormat.MINUTE_DELTA) -> None:
+        self.logger.info("Parsing time formats")
+
+        trip_modes = self.trip_modes
+
+        self.logger.debug("Parsing `o_depart`")
+        trip_modes["o_depart_hr"] = self._convert_time_to_hours(trip_modes["o_depart"], time_format)
+
+        self.logger.debug("Parsing `d_arrive`")
+        trip_modes["d_arrive_hr"] = self._convert_time_to_hours(trip_modes["d_arrive"], time_format)
+
+        self.logger.debug("Classifying `time_period`")
+        trip_modes["time_period"] = self._classify_time_periods(trip_modes["o_depart_hr"])
+
+    def _convert_time_to_hours(self, s: pd.Series, time_format: TimeFormat) -> pd.Series:
+        if time_format == TimeFormat.MINUTE_DELTA:
+            return self._floordiv_minutes(s)
+        elif time_format == TimeFormat.COLON_SEP:
+            return self._convert_text_to_datetime(s)
+        else:
+            raise NotImplementedError(time_format)
+
+    def _convert_text_to_datetime(self, s: pd.Series) -> pd.Series:
+        colon_count = s.str.count(":")
+        filtr = colon_count == 1
+
+        new_time = s.copy()
+        new_time.loc[filtr] += ":00"
+
+        filtr = new_time.str.contains("-")
+        if filtr.sum() > 0:
+            new_time.loc[filtr] = "0:00:00"
+            self.logger.warning(f"Found {filtr.sum()} cells with negative time. These have been corrected to 0:00:00")
+
+        time_table = new_time.str.split(":", expand=True).astype(np.int8)
+        hours = time_table.iloc[:, 0]
+
+        return hours
+
+    @staticmethod
+    def _floordiv_minutes(s: pd.Series) -> pd.Series:
+        converted = s.astype(np.float64)
+        return (converted // 60).astype(np.int32)
+
+    def _classify_time_periods(self, start_hour: pd.Series) -> pd.Series:
+        period = pd.cut(start_hour, self.time_period_bins, right=False, labels=False, include_lowest=True)
+        period = period.replace(0, 5).astype("category")
+        return period
 
     # endregion
