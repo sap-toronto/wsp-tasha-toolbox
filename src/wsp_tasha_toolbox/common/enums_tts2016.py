@@ -44,3 +44,17 @@ class StudentStatus(StrEnum):
     PART_TIME = "P"
     NOT_A_STUDENT = "O"
     UNKNOWN = "9"
+
+
+class TripPurpose(StrEnum):
+    SUBSEQUENT_SCHOOL = "C"
+    DAYCARE = "D"
+    ENTERTAINMENT = "E"
+    FACILITATE_PASSENGER = "F"
+    HOME = "H"
+    MARKET = "M"
+    OTHER = "O"
+    SUBSEQUENT_WORK = "R"
+    SCHOOL = "S"
+    WORK = "W"
+    UNKNOWN = "9"
