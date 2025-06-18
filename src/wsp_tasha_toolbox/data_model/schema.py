@@ -6,7 +6,7 @@ import numpy as np
 import pandera.pandas as pa
 from pandera.typing.pandas import Category, Index, Series
 
-from ..common.enums_microsim import Activity, Direction, Mode
+from ..common.enums_microsim import Activity, Mode, TransitDirection
 from ..common.enums_tts2016 import (DwellingType, EmploymentStatus, Gender,
                                     IncomeClass, Occupation, StudentStatus)
 
@@ -242,7 +242,7 @@ class TripStationsSchema(pa.DataFrameModel):
         description="The zone number for the station",
     )
     direction: Series[Category] = pa.Field(
-        isin=Direction,
+        isin=TransitDirection,
         coerce=True,
         description="The travel direction of the transit trip. Used to determine if station is used as an access or egress point.",
     )

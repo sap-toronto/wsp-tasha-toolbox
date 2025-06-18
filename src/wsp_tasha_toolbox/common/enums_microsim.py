@@ -29,6 +29,6 @@ class Mode(StrEnum):
     VEHICLE_FOR_HIRE = "VFH"
 
 
-class Direction(StrEnum):
+class TransitDirection(StrEnum):
     AUTO_TO_TRANSIT = "auto2transit"
     TRANSIT_TO_AUTO = "transit2auto"
