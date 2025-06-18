@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from os import PathLike
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 import geopandas as gpd
 import numpy as np
@@ -114,6 +114,10 @@ class MicrosimData:
         """Model zone system table"""
         return self._zones
 
+    @property
+    def impedances(self) -> pd.DataFrame:
+        return self._impedances
+
     # endregion
 
     # region Loading
@@ -127,6 +131,7 @@ class MicrosimData:
         rebuild_indices: bool = True,
         sort_indices: bool = True,
         zone_label: str = "taz",
+        coord_unit: float = 0.001,
     ) -> MicrosimData:
         """Initialize a new instance of MicrosimData using files from a model run result folder
 
@@ -137,6 +142,7 @@ class MicrosimData:
             sort_indices (bool, optional): Defaults to ``True``. A flag to sort indices in the microsim tables.
             zone_label (str, optional): Defaults to ``"taz"``. The name of the traffic analysis zone (TAZ) attribute in
                 the zone shapefile.
+            coord_unit (float, optional): Defaults to ``0.001``. A value to adjust distance values with.
         """
         microsim_folder = Path(results_folder) / "Microsim Results"
 
@@ -182,7 +188,7 @@ class MicrosimData:
                 else None
             ),
         )
-        data.attach_zone_system(zone_shapefile, taz_att=zone_label)
+        data.attach_zone_system(zone_shapefile, taz_att=zone_label, coord_unit=coord_unit)
 
         return data
 
@@ -472,22 +478,27 @@ class MicrosimData:
         zone_shapefile: PathLike | str,
         *,
         taz_att: str = "taz",
+        coord_unit: float = 0.001,
     ) -> None:
         """Attach zone system information for analysis
 
         Args:
             zone_shapefile (PathLike | str): Path to the zone shapefile
             taz_att (str, optional): Defaults to ``"taz"``. Name of the traffic analysis zone (TAZ) attribute
+            coord_unit (float, optional): Defaults to ``0.001``. A value to adjust distance values with.
         """
         self.logger.info("Attaching zone system for analysis")
 
         self._zones = self._load_zone_shapefile(zone_shapefile, taz_att=taz_att)
 
+        self.logger.debug("Calculating standard impedances from zone coordinates")
         zones_mindex = pd.MultiIndex.from_product([self._zones.index] * 2, names=["o", "d"])
         if self._impedances is None:
             self._impedances = pd.DataFrame(index=zones_mindex)
         else:
             self._impedances = self._impedances.reindex(zones_mindex, fill_value=0)
+        self._impedances.insert(0, "manhattan", self._calc_std_impedance("manhattan", coord_unit))
+        self._impedances.insert(1, "euclidean", self._calc_std_impedance("euclidean", coord_unit))
 
     @staticmethod
     def _load_zone_shapefile(
@@ -500,5 +511,55 @@ class MicrosimData:
         zones.set_index(taz_att, inplace=True)
         zones.sort_index(inplace=True)
         return zones
+
+    def _calc_std_impedance(
+        self,
+        method: Literal["manhattan", "euclidean", "haversine"],
+        coord_unit: float,
+    ) -> pd.Series:
+        mtx = distance_matrix(
+            self.zones.centroid.x, self.zones.centroid.y, tall=True, method=method, coord_unit=coord_unit
+        ).rename(method)
+        mtx.index.names = ["o", "d"]
+        return mtx
+
+    def attach_impedance(
+        self,
+        name: str,
+        impedance_data: pd.Series | PathLike | str,
+        *,
+        scale_unit: float = 1.0,
+        ignore_missing_ods: bool = False,
+    ) -> None:
+        """Attach impedance values to the impedance table for analysis
+
+        Args:
+            name (str): The name for the impedeance values
+            impedance_data (pd.Series | PathLike | str): Impedance values in the form of matrix data (formatted as a
+                stacked pandas Series) or path to a matrix binary file.
+            scale_unit (float, optional): Defaults to ``1.0``. A scalar value to adjust impedance values.
+            ignore_missing_ods (bool, optional): Defaults to ``False``. A flag to ignore missing ODs. If ``True``,
+                impedance values for missing ODs will be set to zero.
+        """
+        self.logger.info(f"Attaching `{name}` impedance values")
+
+        if self.zones is None:
+            raise RuntimeError("Please attach a zone system first before attaching impedances")
+
+        if not isinstance(impedance_data, pd.Series):
+            impedance_data = read_mdf(impedance_data, tall=True)
+        impedance_data = impedance_data.reindex(self.impedances.index)
+
+        if not ignore_missing_ods:
+            if impedance_data.isna().any():
+                raise ValueError(
+                    "NaN values found after reindexing impedance data to zone system. Please check if `impedance_data` "
+                    "is compatible with the dataset zone system."
+                )
+        impedance_data.fillna(0, inplace=True)
+
+        impedance_data = impedance_data * scale_unit
+
+        self.impedances[name] = impedance_data
 
     # endregion
