@@ -28,7 +28,6 @@ class MicrosimData:
         trip_modes (pd.DataFrame): The trip modes table
         trip_stations (pd.DataFrame): The trip stations table
         facilitate_passengers (pd.DataFrame, optional): Defaults to ``None``. The facilitate passengers table
-        zones (gpd.GeoDataFrame, optional): Defaults to ``None``. The modelled zone system
         reweight_trips (bool, optional): Defaults to ``True``. A flag to reweight trip modes, trip station, and
             facilitate passenger (if available) tables to match total number of trips modelled in the trip table.
         derive_additional_attributes (bool, optional): Defaults to ``True``. A flag to calculate additional attributes
@@ -49,7 +48,6 @@ class MicrosimData:
         trip_stations: pd.DataFrame,
         *,
         facilitate_passengers: pd.DataFrame = None,
-        zones: gpd.GeoDataFrame = None,
         reweight_trips: bool = True,
         derive_additional_attributes: bool = True,
     ) -> None:
@@ -61,7 +59,8 @@ class MicrosimData:
         self._trip_modes = trip_modes
         self._trip_stations = trip_stations
         self._facilitate_passengers = facilitate_passengers
-        self._zones = zones
+        self._zones: Optional[gpd.GeoDataFrame] = None
+        self._impedances: Optional[pd.DataFrame] = None
 
         if reweight_trips:
             self._adjust_trip_weights()
@@ -123,16 +122,21 @@ class MicrosimData:
     def from_result_folder(
         cls,
         results_folder: PathLike | str,
+        zone_shapefile: PathLike | str,
         *,
         rebuild_indices: bool = True,
         sort_indices: bool = True,
+        zone_label: str = "taz",
     ) -> MicrosimData:
         """Initialize a new instance of MicrosimData using files from a model run result folder
 
         Args:
             results_folder (PathLike | str): Path to the model run result folder
+            zone_shapefile (PathLike | str): Path to the zone shapefile to use with the model run
             rebuild_indices (bool, optional): Defaults to ``True``. A flag to rebuild indices in the microsim tables.
             sort_indices (bool, optional): Defaults to ``True``. A flag to sort indices in the microsim tables.
+            zone_label (str, optional): Defaults to ``"taz"``. The name of the traffic analysis zone (TAZ) attribute in
+                the zone shapefile.
         """
         microsim_folder = Path(results_folder) / "Microsim Results"
 
@@ -178,6 +182,7 @@ class MicrosimData:
                 else None
             ),
         )
+        data.attach_zone_system(zone_shapefile, taz_att=zone_label)
 
         return data
 
@@ -457,5 +462,43 @@ class MicrosimData:
 
     # def _derive_trip_direction(self) -> pd.Series:
     #     pass  # TODO
+
+    # endregion
+
+    # region Additional Data
+
+    def attach_zone_system(
+        self,
+        zone_shapefile: PathLike | str,
+        *,
+        taz_att: str = "taz",
+    ) -> None:
+        """Attach zone system information for analysis
+
+        Args:
+            zone_shapefile (PathLike | str): Path to the zone shapefile
+            taz_att (str, optional): Defaults to ``"taz"``. Name of the traffic analysis zone (TAZ) attribute
+        """
+        self.logger.info("Attaching zone system for analysis")
+
+        self._zones = self._load_zone_shapefile(zone_shapefile, taz_att=taz_att)
+
+        zones_mindex = pd.MultiIndex.from_product([self._zones.index] * 2, names=["o", "d"])
+        if self._impedances is None:
+            self._impedances = pd.DataFrame(index=zones_mindex)
+        else:
+            self._impedances = self._impedances.reindex(zones_mindex, fill_value=0)
+
+    @staticmethod
+    def _load_zone_shapefile(
+        fp: PathLike | str,
+        *,
+        taz_att: str,
+    ) -> gpd.GeoDataFrame:
+        zones = gpd.read_file(fp)
+        zones = zones.astype({taz_att: np.int64})
+        zones.set_index(taz_att, inplace=True)
+        zones.sort_index(inplace=True)
+        return zones
 
     # endregion
