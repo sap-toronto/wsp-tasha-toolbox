@@ -10,7 +10,11 @@ import pandas as pd
 from wsp_balsa.logging import ModelLogger, get_model_logger
 from wsp_balsa.routines import distance_matrix, read_mdf
 
+from ..common.activity_pairs import activity_pair_mapping
 from ..common.enums_data import TimeFormat
+from ..common.enums_model import OccEmp, StudentClass
+from ..common.enums_tts2016 import (EmploymentStatus, Occupation,
+                                    StudentStatus, TripPurpose)
 from . import schema as ms
 
 
@@ -32,6 +36,9 @@ class MicrosimData:
     """
 
     time_period_bins = (0, 6, 9, 15, 19, 24, np.inf)
+    student_age_range_primary = (5, 13)
+    student_age_range_secondary = (14, 17)
+    student_age_range_post_secondary = (18, np.inf)
 
     def __init__(
         self,
@@ -61,6 +68,9 @@ class MicrosimData:
 
         if derive_additional_attributes:
             self._classify_times()
+            self._derive_household_attributes()
+            self._derive_person_attributes()
+            self._derive_trip_attributes()
 
         self.logger.report("Microsim tables successfully loaded!")
 
@@ -360,5 +370,92 @@ class MicrosimData:
         period = pd.cut(start_hour, self.time_period_bins, right=False, labels=False, include_lowest=True)
         period = period.replace(0, 5).astype("category")
         return period
+
+    def _derive_household_attributes(self) -> None:
+        self.logger.info("Deriving additional household attributes")
+
+        self.logger.debug("Processing `drivers`")
+        self.households["drivers"] = self._derive_household_drivers()
+
+        self.logger.debug("Processing `auto_suff`")
+        self.households["auto_suff"] = self._derive_household_auto_sufficiency()
+
+    def _derive_household_drivers(self) -> pd.Series:
+        drivers = self.persons.groupby("household_id")["license"].count().reindex(self.households.index, fill_value=0)
+        return drivers
+
+    def _derive_household_auto_sufficiency(self) -> pd.Series:
+        num_cars = self.households["vehicles"]
+        num_drivers = self.households["drivers"]
+        car_suff = pd.Series(
+            np.where(num_cars == 0, 0, (num_cars >= num_drivers) + 1) + 1, index=self.households.index
+        )
+        return car_suff
+
+    def _derive_person_attributes(self) -> None:
+        self.logger.info("Deriving additional person attributes")
+
+        self.logger.debug("Processing `student_class`")
+        self.persons["student_class"] = self._derive_person_student_class()
+
+        self.logger.debug("Processing `occ_emp`")
+        self.persons["occ_emp"] = self._derive_person_occ_emp()
+
+        self.logger.debug("Processing `work_at_home`")
+        self.persons["work_at_home"] = self._derive_person_work_at_home()
+
+    def _derive_person_student_class(self) -> pd.Series:
+        stu_class = pd.Series(StudentClass.UNKNOWN, index=self.persons.index, name="student_class")
+        stu_class.loc[self.persons["student_status"] == StudentStatus.NOT_A_STUDENT] = StudentClass.NOT_A_STUDENT
+        stu_class_groups = {
+            StudentClass.PRIMARY: self.student_age_range_primary,
+            StudentClass.SECONDARY: self.student_age_range_secondary,
+            StudentClass.POST_SECONDARY: self.student_age_range_post_secondary,
+        }
+        mask_student = self.persons["student_status"].isin({StudentStatus.FULL_TIME, StudentStatus.PART_TIME})
+        for label, age_range in stu_class_groups.items():
+            mask_age = self.persons["age"].between(*age_range)
+            stu_class.loc[mask_student & mask_age] = label
+        return stu_class.astype("category")
+
+    def _derive_person_occ_emp(self) -> pd.Series:
+        occ_emp = pd.Series(OccEmp.UNKNOWN, index=self.persons.index, name="occ_emp")
+        for (occ, emp), subset in self.persons.groupby(["occupation", "employment_status"], observed=True):
+            if (occ == Occupation.UNKNOWN) or (emp == EmploymentStatus.UNKNOWN):
+                occ_emp.loc[subset.index] = OccEmp.UNKNOWN
+            elif (occ == Occupation.NOT_EMPLOYED) or (emp == EmploymentStatus.NOT_EMPLOYED):
+                occ_emp.loc[subset.index] = OccEmp.NOT_EMPLOYED
+            elif emp == EmploymentStatus.FULL_TIME_AT_HOME:
+                occ_emp.loc[subset.index] = f"{occ}{EmploymentStatus.FULL_TIME}"
+            elif emp == EmploymentStatus.PART_TIME_AT_HOME:
+                occ_emp.loc[subset.index] = f"{occ}{EmploymentStatus.PART_TIME}"
+            else:
+                occ_emp.loc[subset.index] = f"{occ}{emp}"
+        return occ_emp.astype("category")
+
+    def _derive_person_work_at_home(self) -> pd.Series:
+        return (
+            self.persons["employment_status"]
+            .isin([EmploymentStatus.FULL_TIME_AT_HOME, EmploymentStatus.PART_TIME_AT_HOME])
+            .rename("work_at_home")
+        )
+
+    def _derive_trip_attributes(self) -> None:
+        self.logger.info("Deriving additional trip attributes")
+
+        self.logger.debug("Processing `purpose`")
+        self.trips["purpose"] = self._derive_trip_purpose()
+
+        # self.logger.debug("Processing `direction`")
+        # self.trips["direction"] = self._derive_trip_direction()
+
+    def _derive_trip_purpose(self) -> pd.Series:
+        purpose = pd.Series(TripPurpose.OTHER, index=self.trips.index, name="purpose")
+        for (o_act, d_act), subset in self.trips.groupby(["o_act", "d_act"], observed=True):
+            purpose.loc[subset.index] = activity_pair_mapping[(o_act, d_act)]
+        return purpose.astype("category")
+
+    # def _derive_trip_direction(self) -> pd.Series:
+    #     pass  # TODO
 
     # endregion
