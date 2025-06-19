@@ -16,17 +16,17 @@ class Activity(StrEnum):
 
 class Mode(StrEnum):
     AUTO = "Auto"
-    CARPOOL = "Carpool"
-    SCHOOLBUS = "Schoolbus"
-    DRIVE_ACCESS_TRANSIT = "DAT"
-    WALK_ACCESS_TRANSIT = "WAT"
-    WALK = "Walk"
-    BIKE = "Bicycle"
-    PASSENGER = "Passenger"
     RIDESHARE = "RideShare"
+    VEHICLE_FOR_HIRE = "VFH"
+    PASSENGER = "Passenger"
+    CARPOOL = "Carpool"
+    WALK_ACCESS_TRANSIT = "WAT"
+    DRIVE_ACCESS_TRANSIT = "DAT"
     PASSENGER_ACCESS_TRANSIT = "PAT"
     PASSENGER_EGRESS_TRANSIT = "PET"
-    VEHICLE_FOR_HIRE = "VFH"
+    WALK = "Walk"
+    BIKE = "Bicycle"
+    SCHOOLBUS = "Schoolbus"
 
 
 class TransitDirection(StrEnum):
