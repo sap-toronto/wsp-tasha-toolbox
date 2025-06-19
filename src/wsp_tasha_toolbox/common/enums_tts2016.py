@@ -47,14 +47,14 @@ class StudentStatus(StrEnum):
 
 
 class TripPurpose(StrEnum):
-    SUBSEQUENT_SCHOOL = "C"
-    DAYCARE = "D"
-    ENTERTAINMENT = "E"
-    FACILITATE_PASSENGER = "F"
-    HOME = "H"
-    MARKET = "M"
-    OTHER = "O"
+    WORK = "W"
     SUBSEQUENT_WORK = "R"
     SCHOOL = "S"
-    WORK = "W"
+    SUBSEQUENT_SCHOOL = "C"
+    DAYCARE = "D"
+    FACILITATE_PASSENGER = "F"
+    MARKET = "M"
+    ENTERTAINMENT = "E"
+    OTHER = "O"
+    HOME = "H"
     UNKNOWN = "9"
