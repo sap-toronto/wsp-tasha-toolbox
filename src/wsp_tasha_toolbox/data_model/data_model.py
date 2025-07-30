@@ -392,7 +392,7 @@ class MicrosimData:
         self.households["auto_suff"] = self._derive_household_auto_sufficiency()
 
     def _derive_household_drivers(self) -> pd.Series:
-        drivers = self.persons.groupby("household_id")["license"].count().reindex(self.households.index, fill_value=0)
+        drivers = self.persons.groupby("household_id")["license"].sum().reindex(self.households.index, fill_value=0)
         return drivers
 
     def _derive_household_auto_sufficiency(self) -> pd.Series:
