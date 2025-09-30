@@ -1,3 +1,10 @@
+__all__ = [
+    "CarSufficiency",
+    "OccEmp",
+    "StudentClass",
+    "TimePeriod",
+]
+
 from enum import IntEnum, StrEnum
 
 

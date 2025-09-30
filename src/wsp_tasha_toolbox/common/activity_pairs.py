@@ -1,3 +1,7 @@
+__all__ = [
+    "activity_pair_mapping",
+]
+
 from .enums_microsim import Activity
 from .enums_tts2016 import TripPurpose
 
