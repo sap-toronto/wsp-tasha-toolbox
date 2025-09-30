@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+__all__ = [
+    "MicrosimData",
+]
+
 from os import PathLike
 from pathlib import Path
 from typing import Literal, Optional
@@ -13,8 +17,7 @@ from wsp_balsa.routines import distance_matrix, read_mdf
 from ..common.activity_pairs import activity_pair_mapping
 from ..common.enums_data import TimeFormat
 from ..common.enums_model import OccEmp, StudentClass
-from ..common.enums_tts2016 import (EmploymentStatus, Occupation,
-                                    StudentStatus, TripPurpose)
+from ..common.enums_tts2016 import EmploymentStatus, Occupation, StudentStatus, TripPurpose
 from . import schema as ms
 
 
@@ -398,9 +401,7 @@ class MicrosimData:
     def _derive_household_auto_sufficiency(self) -> pd.Series:
         num_cars = self.households["vehicles"]
         num_drivers = self.households["drivers"]
-        car_suff = pd.Series(
-            np.where(num_cars == 0, 0, (num_cars >= num_drivers) + 1) + 1, index=self.households.index
-        )
+        car_suff = pd.Series(np.where(num_cars == 0, 0, (num_cars >= num_drivers) + 1) + 1, index=self.households.index)
         return car_suff
 
     def _derive_person_attributes(self) -> None:

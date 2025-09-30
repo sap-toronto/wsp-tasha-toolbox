@@ -1,3 +1,13 @@
+__all__ = [
+    "DwellingType",
+    "IncomeClass",
+    "Gender",
+    "Occupation",
+    "EmploymentStatus",
+    "StudentStatus",
+    "TripPurpose",
+]
+
 from enum import IntEnum, StrEnum
 
 
