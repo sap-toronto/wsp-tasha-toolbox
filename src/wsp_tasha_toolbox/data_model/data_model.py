@@ -153,7 +153,7 @@ class MicrosimData:
         households = cls._load_households(microsim_folder / "households.csv")
         persons = cls._load_persons(microsim_folder / "persons.csv", rebuild_index=rebuild_indices)
         trips = cls._load_trips(microsim_folder / "trips.csv", rebuild_index=rebuild_indices)
-        trip_modes = cls._load_trips(microsim_folder / "trip_modes.csv", rebuild_index=rebuild_indices)
+        trip_modes = cls._load_trip_modes(microsim_folder / "trip_modes.csv", rebuild_index=rebuild_indices)
         trip_stations = cls._load_trip_stations(microsim_folder / "trip_stations.csv", rebuild_index=rebuild_indices)
         facilitate_passengers_fp = microsim_folder / "facilitate_passenger.csv"
         if facilitate_passengers_fp.exists():

@@ -12,8 +12,11 @@ __all__ = [
 from typing import Optional
 
 import numpy as np
+import pandas as pd
 import pandera.pandas as pa
+from pandas.api.types import is_string_dtype
 from pandera.typing.pandas import Category, Index, Series
+from wsp_balsa.logging import get_model_logger
 
 from ..common.enums_microsim import Activity, Mode, TransitDirection
 from ..common.enums_tts2016 import DwellingType, EmploymentStatus, Gender, IncomeClass, Occupation, StudentStatus
@@ -209,13 +212,11 @@ class TripModesSchema(pa.DataFrameModel):
         description="The name of the mode that was used",
     )
     o_depart: Series[np.float64] = pa.Field(
-        ge=0,
-        coerce=True,
+        coerce=False,
         description="The time that the trip started / departed the origin, relative to 12:00 AM",
     )
     d_arrive: Series[np.float64] = pa.Field(
-        ge=0,
-        coerce=True,
+        coerce=False,
         description="The time that the trip ended / arrived at the destination, relative to 12:00 AM",
     )
     weight: Series[np.int64] = pa.Field(
@@ -223,6 +224,25 @@ class TripModesSchema(pa.DataFrameModel):
         coerce=True,
         description="The number of times that this mode was selected for the given trip",
     )
+
+    @pa.parser("o_depart")
+    def parse_o_depart(cls, series: pd.Series):
+        if is_string_dtype(series):
+            raise NotImplementedError("Cannot handle colon-separated `o_depart` values yet")  # TODO
+        if (series < 0).any():
+            logger = get_model_logger(f"wsp_tasha_toolbox.{cls.__name__}")
+            logger.warning(f"Found {(series < 0).sum()} cells with negative `o_depart` values. These will be set to 0.")
+        series = series.clip(lower=0)
+        return series
+
+    @pa.parser("d_arrive")
+    def parse_d_arrive(cls, series):
+        if is_string_dtype(series):
+            raise NotImplementedError("Cannot handle colon-separated `d_arrive` values yet")  # TODO
+        if (series < 240).any():
+            logger = get_model_logger(f"wsp_tasha_toolbox.{cls.__name__}")
+            logger.warning(f"Found {(series < 240).sum()} cells with `d_arrive` values < 240")
+        return series
 
 
 class TripStationsSchema(pa.DataFrameModel):
