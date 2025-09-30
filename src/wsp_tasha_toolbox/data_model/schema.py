@@ -209,7 +209,6 @@ class TripModesSchema(pa.DataFrameModel):
         description="The name of the mode that was used",
     )
     o_depart: Series[np.float64] = pa.Field(
-        ge=0,
         coerce=True,
         description="The time that the trip started / departed the origin, relative to 12:00 AM",
     )
