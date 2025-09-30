@@ -1,6 +1,8 @@
 # wsp-tasha-toolbox
 
-A toolbox for working with travel demand models based upon the *Travel Activity Scheduler for Household Agents (TASHA)* model.
+![PyPI - Version](https://img.shields.io/pypi/v/wsp-tasha-toolbox)
+
+A toolbox for working with travel demand models based upon the *Travel Activity Scheduler for Household Agents (TASHA)* model structure.
 
 Tools included in this toolbox are designed to work with models built using GTAModel V4.0+.
 
