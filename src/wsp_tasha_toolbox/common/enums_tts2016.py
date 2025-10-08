@@ -50,7 +50,7 @@ class Occupation(StrEnum):
 
 
 class StudentStatus(StrEnum):
-    FULL_TIME = "F"
+    FULL_TIME = "S"
     PART_TIME = "P"
     NOT_A_STUDENT = "O"
     UNKNOWN = "9"
