@@ -210,6 +210,10 @@ class MicrosimData:
             "person_id": str if rebuild_index else np.uint64,
         }
         df = pd.read_csv(fp, index_col=["household_id", "person_id"], dtype=spec)
+
+        # Relabel full-time students
+        df["student_status"] = df["student_status"].replace("F", StudentStatus.FULL_TIME)
+
         return df
 
     @staticmethod
