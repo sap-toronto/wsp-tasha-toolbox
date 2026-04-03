@@ -51,7 +51,7 @@ def read_tts_cross_tabulation_file(fp: PathLike | str) -> pd.DataFrame:
             skip_rows = start_row + 1
             n_rows = end_row - start_row - 4
 
-            df = _read_csv_tts_ct_data(fp, row_att, col_att, skiprows=skip_rows, nrows=n_rows, skipinitialspace=True)
+            df = _read_csv_tts_ct_data(fp, row_att, col_att, skip_rows=skip_rows, nrows=n_rows, skipinitialspace=True)
             df[table_att] = table_name
             table.append(df)
         table = pd.concat(table, axis=0, ignore_index=True)
@@ -62,16 +62,16 @@ def read_tts_cross_tabulation_file(fp: PathLike | str) -> pd.DataFrame:
                 if line.strip().startswith(row_att) or line.strip().startswith(","):
                     header_row = i
                     break
-        table = _read_csv_tts_ct_data(fp, row_att, col_att, skiprows=header_row - 1, skipinitialspace=True)
+        table = _read_csv_tts_ct_data(fp, row_att, col_att, skip_rows=header_row - 1, skipinitialspace=True)
 
     return table
 
 
 def _read_csv_tts_ct_data(fp: Path, row_att: str, col_att: str, skip_rows: int, **kwargs) -> pd.DataFrame:
     try:  # First try column format
-        df: pd.DataFrame = pd.read_csv(fp, index_col=[row_att, col_att], delim_whitespace=True, **kwargs)
+        df: pd.DataFrame = pd.read_csv(fp, index_col=[row_att, col_att], sep=",", skiprows=skip_rows, **kwargs)
     except Exception:  # Else try table format
-        df: pd.DataFrame = pd.read_csv(fp, index_col=0, **kwargs)
+        df: pd.DataFrame = pd.read_csv(fp, index_col=0, sep=",", skiprows=skip_rows,**kwargs)
         df.index.name = row_att
         df.columns.name = col_att
         df = df.stack().to_frame(name="total")
