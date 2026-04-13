@@ -33,7 +33,8 @@ build-backend = "setuptools.build_meta"
 [dependency-groups]
 dev = [
     "build>=1.2.2.post1,<2",
-    "twine>=6.0.1,<7"
+    "ipykernel>=7.2.0",
+    "twine>=6.0.1,<7",
 ]
 
 [tool.setuptools.packages.find]
