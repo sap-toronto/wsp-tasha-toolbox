@@ -1,11 +1,11 @@
 __all__ = [
-    "activity_pair_mapping",
+    "ACTIVITY_PAIR_MAPPING",
 ]
 
 from .enums_microsim import Activity
 from .enums_tts2016 import TripPurpose
 
-activity_pair_mapping = {
+ACTIVITY_PAIR_MAPPING = {
     (Activity.HOME, Activity.HOME): TripPurpose.HOME,
     (Activity.HOME, Activity.INDIVIDUAL_OTHER): TripPurpose.OTHER,
     (Activity.HOME, Activity.JOINT_MARKET): TripPurpose.MARKET,
