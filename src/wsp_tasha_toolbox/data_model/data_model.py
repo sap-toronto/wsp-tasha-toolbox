@@ -17,7 +17,12 @@ from wsp_balsa.routines import distance_matrix, read_mdf
 from ..common.activity_pairs import activity_pair_mapping
 from ..common.enums_data import TimeFormat
 from ..common.enums_model import OccEmp, StudentClass
-from ..common.enums_tts2016 import EmploymentStatus, Occupation, StudentStatus, TripPurpose
+from ..common.enums_tts2016 import (
+    EmploymentStatus,
+    Occupation,
+    StudentStatus,
+    TripPurpose,
+)
 from . import schema as ms
 
 
@@ -166,7 +171,12 @@ class MicrosimData:
         # Reindex persons
         if rebuild_indices:
             cls._rebuild_microsim_indices(
-                households, persons, trips, trip_modes, trip_stations, facilitate_passengers=facilitate_passengers
+                households,
+                persons,
+                trips,
+                trip_modes,
+                trip_stations,
+                facilitate_passengers=facilitate_passengers,
             )
 
         # Sort indices
@@ -255,7 +265,11 @@ class MicrosimData:
             "passenger_trip_id": np.uint16,
             "driver_id": str if rebuild_index else np.uint64,
         }
-        df = pd.read_csv(fp, index_col=["household_id", "passenger_id", "passenger_trip_id"], dtype=spec)
+        df = pd.read_csv(
+            fp,
+            index_col=["household_id", "passenger_id", "passenger_trip_id"],
+            dtype=spec,
+        )
         return df
 
     @staticmethod
@@ -278,7 +292,12 @@ class MicrosimData:
         trips.index = pd.MultiIndex.from_frame(trips_idx)
         if "JointTourRep" in trips:
             trips["JointTourRep"] = (
-                pd.MultiIndex.from_arrays([trips.index.get_level_values("household_id"), trips["JointTourRep"]])
+                pd.MultiIndex.from_arrays(
+                    [
+                        trips.index.get_level_values("household_id"),
+                        trips["JointTourRep"],
+                    ]
+                )
                 .map(person_idx["person_id"])
                 .fillna(-1)
                 .astype(np.int64)
@@ -298,7 +317,10 @@ class MicrosimData:
                 person_idx["person_id"]
             )
             facilitate_passengers_idx["driver_id"] = pd.MultiIndex.from_arrays(
-                [facilitate_passengers.index.get_level_values("household_id"), facilitate_passengers["driver_id"]]
+                [
+                    facilitate_passengers.index.get_level_values("household_id"),
+                    facilitate_passengers["driver_id"],
+                ]
             ).map(person_idx["person_id"])
             facilitate_passengers["driver_id"] = facilitate_passengers_idx["driver_id"]
             facilitate_passengers.index = pd.MultiIndex.from_frame(facilitate_passengers_idx.drop("driver_id", axis=1))
@@ -385,7 +407,13 @@ class MicrosimData:
         return (converted // 60).astype(np.int32)
 
     def _classify_time_periods(self, start_hour: pd.Series) -> pd.Series:
-        period = pd.cut(start_hour, self.time_period_bins, right=False, labels=False, include_lowest=True)
+        period = pd.cut(
+            start_hour,
+            self.time_period_bins,
+            right=False,
+            labels=False,
+            include_lowest=True,
+        )
         period = period.replace(0, 5).astype("category")
         return period
 
@@ -405,11 +433,21 @@ class MicrosimData:
     def _derive_household_auto_sufficiency(self) -> pd.Series:
         num_cars = self.households["vehicles"]
         num_drivers = self.households["drivers"]
-        car_suff = pd.Series(np.where(num_cars == 0, 0, (num_cars >= num_drivers) + 1) + 1, index=self.households.index)
+        car_suff = pd.Series(
+            np.where(num_cars == 0, 0, (num_cars >= num_drivers) + 1) + 1,
+            index=self.households.index,
+        )
         return car_suff
 
     def _derive_person_attributes(self) -> None:
         self.logger.info("Deriving additional person attributes")
+
+        self.logger.debug("Processing `home_zone`")
+        self.persons.insert(
+            self.persons.columns.get_loc("work_zone"),
+            "home_zone",
+            self.households["home_zone"].reindex(self.persons.index.get_level_values("household_id")).values,
+        )
 
         self.logger.debug("Processing `student_class`")
         self.persons["student_class"] = self._derive_person_student_class()
@@ -523,7 +561,11 @@ class MicrosimData:
         coord_unit: float,
     ) -> pd.Series:
         mtx = distance_matrix(
-            self.zones.centroid.x, self.zones.centroid.y, tall=True, method=method, coord_unit=coord_unit
+            self.zones.centroid.x,
+            self.zones.centroid.y,
+            tall=True,
+            method=method,
+            coord_unit=coord_unit,
         ).rename(method)
         mtx.index.names = ["o", "d"]
         return mtx
@@ -566,5 +608,36 @@ class MicrosimData:
         impedance_data = impedance_data * scale_unit
 
         self.impedances[name] = impedance_data
+
+    def get_impedance(
+        self,
+        table: Literal["persons", "trips"],
+        p_col: str,
+        q_col: str,
+        impedance_name: str,
+    ) -> pd.Series:
+        """Get impedance values for a person or trip table based on origin `p` to destination `q` zones
+
+        Args:
+            table (Literal["persons", "trips"]): The table to get impedance values for
+            p_col (str): The name of the column in the table representing the origin `p` zone
+            q_col (str): The name of the column in the table representing the destination `q` zone
+            impedance_name (str): The name of the impedance values to get (must be attached to the dataset)
+
+        Returns:
+            pd.Series: A Series of impedance values for each record in the specified table
+        """
+        if (self.impedances is None) or (impedance_name not in self.impedances.columns):
+            raise ValueError(f"Impedance `{impedance_name}` not found. Please attach impedance data first.")
+
+        if table in {"persons", "trips"}:
+            df: pd.DataFrame = getattr(self, table)
+        else:
+            raise ValueError(table)
+
+        ods = pd.MultiIndex.from_frame(df[[p_col, q_col]].rename(columns={p_col: "o", q_col: "d"}))
+        impedance_values = self.impedances[impedance_name].reindex(ods).values
+
+        return pd.Series(impedance_values, index=df.index, name=impedance_name)
 
     # endregion
