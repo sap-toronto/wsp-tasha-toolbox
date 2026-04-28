@@ -133,7 +133,7 @@ def _parse_ct_column_format(
     tables = []
     for j, (table_val, sec_start) in enumerate(sections):
         data_start = next((k for k in range(sec_start + 1, len(lines)) if lines[k].strip()), None)
-        sec_end = sections[j + 1][1] if j + 1 < len(sections) else len(lines)
+        sec_end = sections[j + 1][1] - 1 if j + 1 < len(sections) else len(lines)
         data_lines = [ln for ln in lines[data_start:sec_end] if ln.strip()]
 
         df = _parse_ct_column_block("\n".join(data_lines))
@@ -175,6 +175,6 @@ def read_tts_cross_tabulation_file(fp: PathLike | str) -> pd.DataFrame:
     """
     fp = Path(fp).resolve(strict=True)
     with open(fp) as f:
-        lines = [line.strip() for line in f if line.strip()]
+        lines = [line.rstrip() for line in f]
 
     return read_tts_cross_tabulation(lines)
