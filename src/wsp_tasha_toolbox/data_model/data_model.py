@@ -14,7 +14,7 @@ import pandas as pd
 from wsp_balsa.logging import ModelLogger, get_model_logger
 from wsp_balsa.routines import distance_matrix, read_mdf
 
-from ..common.activity_pairs import activity_pair_mapping
+from ..common.activity_pairs import ACTIVITY_PAIR_MAPPING
 from ..common.enums_data import TimeFormat
 from ..common.enums_model import OccEmp, StudentClass
 from ..common.enums_tts2016 import (
@@ -506,7 +506,7 @@ class MicrosimData:
     def _derive_trip_purpose(self) -> pd.Series:
         purpose = pd.Series(TripPurpose.OTHER, index=self.trips.index, name="purpose")
         for (o_act, d_act), subset in self.trips.groupby(["o_act", "d_act"], observed=True):
-            purpose.loc[subset.index] = activity_pair_mapping[(o_act, d_act)]
+            purpose.loc[subset.index] = ACTIVITY_PAIR_MAPPING[(o_act, d_act)]
         return purpose.astype("category")
 
     # def _derive_trip_direction(self) -> pd.Series:
