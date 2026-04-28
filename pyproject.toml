@@ -34,6 +34,7 @@ build-backend = "setuptools.build_meta"
 dev = [
     "build>=1.2.2.post1,<2",
     "ipykernel>=7.2.0",
+    "pytest>=9.0.3",
     "twine>=6.0.1,<7",
 ]
 
